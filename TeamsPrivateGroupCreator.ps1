@@ -29,7 +29,7 @@
 #Uninstall-Module MicrosoftTeams
 #
 ## Install new MicrosoftTeams preview module
-#Install-Module -Name MicrosoftTeams -RequiredVersion 1.1.9-preview -AllowPrerelease
+#Install-Module -Name MicrosoftTeams -RequiredVersion 3.1.1 -AllowPrerelease
 #
 ## Some additional commands for debugging
 #Get-Module -Name MicrosoftTeams
@@ -131,7 +131,8 @@ function CreatePrivateChannelForStudent($GroupId, $StudentName, $ChannelPrefix, 
     }
     
     # Create the channel
-    $ChannelName = "$ChannelPrefix$StudentName"
+    $StudentNameTrimmed = $StudentName.Trim("'")
+    $ChannelName = "$ChannelPrefix$StudentNameTrimmed"
     "Creating private channel '$ChannelName'"
     try
     {
@@ -141,6 +142,28 @@ function CreatePrivateChannelForStudent($GroupId, $StudentName, $ChannelPrefix, 
     {
         Write-Warning "ERROR: Failed to create a private channel '$ChannelName' (already exists?)"
     }
+}
+
+function ChangePrivateChannelName($Group, $StudentName, $ChannelPrefix)
+{
+    # Check if student is present in the team
+    $StudentTeamsEmail = (Get-TeamUser -GroupId $GroupId | where Name -Like $StudentName).User
+    if(!$StudentTeamsEmail)
+    {
+        "ERROR: Student '$StudentName' not found from the team!"
+        return
+    }
+
+    $CurrentChannelName = "$ChannelPrefix$StudentName"
+    $NewChannelName = "WED 10 $StudentName"
+    #try
+    #{
+        Set-TeamChannel -GroupId $GroupId -CurrentDisplayName "$CurrentChannelName" -NewDisplayName "$NewChannelName"
+    #}
+   # catch
+    #{
+    #    Write-Warning "ERROR: Failed to change a private channel '$ChannelName' name"
+   # }
 }
 
 function AddStudentAndAdminsToPrivateChannel($GroupId, $StudentName, $ChannelPrefix, [array]$Admins)
@@ -153,7 +176,8 @@ function AddStudentAndAdminsToPrivateChannel($GroupId, $StudentName, $ChannelPre
         return
     }
 
-    $ChannelName = "$ChannelPrefix$StudentName"
+    $StudentNameTrimmed = $StudentName.Trim("'")
+    $ChannelName = "$ChannelPrefix$StudentNameTrimmed"
 
     # Add the student to the channel
     try
@@ -185,41 +209,43 @@ function AddStudentAndAdminsToPrivateChannel($GroupId, $StudentName, $ChannelPre
 ########################## ENTER TEAM DETAILS HERE #####################################
 
 # Graphical programming course team 1
-#$GroupDisplayName = "Visuaalprogrammeerimine (LOTI.05.086)"
-#$GroupShortName = "VisProg21K"
+#$GroupDisplayName = "Visuaalprogrammeerimine 22/23K (LOTI.05.086)"
+#$GroupShortName = "VisProg23K"
 
 # Graphical programming course team 2
-#$GroupDisplayName = "Visuaalprogrammeerimine (LOTI.05.086) AT3, TN1, TN2"
-#$GroupShortName = "VisProg21KLisa"
+#$GroupDisplayName = "Visuaalprogrammeerimine 22/23K (LOTI.05.086) N14"
+#$GroupShortName = "VisProg23KLisa"
 
 # Data acquisition course
-$GroupDisplayName = "Data Acquisition and Signal Processing (LOTI.05.052)"
-$GroupShortName = "DataAcquisitionandSignalProcessingLOTI.05.052"
+$GroupDisplayName = "2023 DAQSP (LOTI.05.052)"
+$GroupShortName = "DAQSP2023Fall"
 
 
 # Global variable that will hold an ID of the team
 $global:GroupId = $null
+#$global:GroupId = "3a9165a2-731f-44a9-9507-20265b75b7af"
 
 # Let's go
 Connect-MicrosoftTeams
 
+# Read the admins Teams email addresses from a text file, each address in a separate line.
+$Admins = [array](Get-Content -Path "C:\Users\Veiko\Desktop\DAQSP\daqadmins.csv")
+$Admins | ft
+
 CreateNewGroup -GroupShortName "$GroupShortName" -GroupDisplayName "$GroupDisplayName" -Owner $Admins[0] -GroupIdRef ([REF]$global:GroupId)
 "Using GroupId: " + $global:GroupId
 
-# Read the admins Teams email addresses from a text file, each address in a separate line.
-$Admins = [array](Get-Content -Path "C:\Users\Veiko\Desktop\DAQSP\admins.csv")
-$Admins | ft
-#AddAdminsToGroup -GroupId "$global:GroupId" -Admins $Admins
+AddAdminsToGroup -GroupId "$global:GroupId" -Admins $Admins
 
 # Read the registered students from a CSV file.
 # Use semicolon as a separator amd the following format with a header row (FirstName; LastName; Group; Student Email)
-$Students = [array](Import-Csv -Delimiter ";" -Path "C:\Users\Veiko\Desktop\DAQSP\students.csv") 
+$Students = [array](Import-Csv -Delimiter ";" -Path "C:\Users\Veiko\Desktop\DAQSP\daqstudents.csv") 
 "Students total: " + $Students.Count
 $Students | ft
 
 # Get a subset of students to fit into max 30 private group limit.
-#$students = $students |  Where-Object {$_.Group -eq "AT1" -or $_.Group -eq "AT2"}
-#$Students = $Students |  Where-Object {$_.Group -eq "AT3" -or $_.Group -eq "TN2" -or $_.Group -eq "TN1"}
+#$students = $students |  Where-Object {$_.Group -eq "K12" -or $_.Group -eq "N12"}
+#$Students = $Students |  Where-Object {$_.FirstName -eq "X" -or $_.LastName -eq "Y" -or $_.LastName -eq "Z"}
 #"Students subset: " + $Students.Count
 #$Students | ft
 
@@ -238,8 +264,8 @@ foreach($line in $Students)
 {
     if($line)
     {
-#        CreatePrivateChannelForStudent -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -ChannelPrefix "$($line.Group) " -Admins $Admins
-        CreatePrivateChannelForStudent -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -Admins $Admins
+        CreatePrivateChannelForStudent -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -ChannelPrefix "$($line.Group) " -Admins $Admins
+#        CreatePrivateChannelForStudent -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -Admins $Admins
     }
 }
 
@@ -248,8 +274,18 @@ foreach($line in $Students)
 {
     if($line)
     {
-#        AddStudentAndAdminsToPrivateChannel -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -ChannelPrefix "$($line.Group) " -Admins $Admins
-        AddStudentAndAdminsToPrivateChannel -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -Admins $Admins
+        AddStudentAndAdminsToPrivateChannel -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -ChannelPrefix "$($line.Group) " -Admins $Admins
+#        AddStudentAndAdminsToPrivateChannel -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -Admins $Admins
+    }
+}
+
+
+foreach($line in $Students)
+{
+
+    if($line)
+    {
+        ChangePrivateChannelName -GroupId "$global:GroupId" -StudentName "$($line.FirstName) $($line.LastName)" -ChannelPrefix "$($line.Group) "
     }
 }
 
